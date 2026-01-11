@@ -285,8 +285,8 @@ func (p *configParser) specifyUpstream(domains []string, u string, idx int) (err
 	addr := dnsUpstream.Address()
 
 	// If flags already exist, merge them (in case same upstream is used multiple times)
-	if existingOpts, exists := p.upstreamFlags[addr]; exists {
-		existingOpts.Merge(flags)
+	if existingFlags, exists := p.upstreamFlags[addr]; exists {
+		existingFlags.Merge(flags)
 	} else {
 		p.upstreamFlags[addr] = flags
 	}
