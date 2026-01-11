@@ -32,6 +32,9 @@ type UpstreamConfig struct {
 
 	// Upstreams is a list of default upstreams.
 	Upstreams []upstream.Upstream
+
+	// UpstreamFlags maps upstream address to its parsed flags
+	UpstreamFlags map[string]UpstreamFlags
 }
 
 // type check
@@ -109,6 +112,7 @@ func ParseUpstreamsConfig(
 		specifiedDomainUpstreams: map[string][]upstream.Upstream{},
 		subdomainsOnlyUpstreams:  map[string][]upstream.Upstream{},
 		subdomainsOnlyExclusions: container.NewMapSet[string](),
+		upstreamFlags:            map[string]UpstreamFlags{},
 	}
 
 	return p.parse(lines)
@@ -166,6 +170,9 @@ type configParser struct {
 
 	// upstreams is a list of default upstreams.
 	upstreams []upstream.Upstream
+
+	// Track parsed flags for each upstream
+	upstreamFlags map[string]UpstreamFlags
 }
 
 // parse returns UpstreamConfig and error if upstreams configuration is invalid.
@@ -188,6 +195,7 @@ func (p *configParser) parse(lines []string) (c *UpstreamConfig, err error) {
 		DomainReservedUpstreams:  p.domainReservedUpstreams,
 		SpecifiedDomainUpstreams: p.specifiedDomainUpstreams,
 		SubdomainExclusions:      p.subdomainsOnlyExclusions,
+		UpstreamFlags:            p.upstreamFlags,
 	}, errors.Join(errs...)
 }
 
@@ -255,20 +263,34 @@ func splitConfigLine(confLine string) (upstreams, domains []string, err error) {
 
 // specifyUpstream specifies the upstream for domains.
 func (p *configParser) specifyUpstream(domains []string, u string, idx int) (err error) {
-	dnsUpstream, ok := p.upstreamsIndex[u]
+    // Parse flags from upstream address
+	upstreamAddr, flags, err := parseUpstreamFlags(u)
+	if err != nil {
+		return fmt.Errorf("parsing upstream flags: %w", err)
+	}
+
+	dnsUpstream, ok := p.upstreamsIndex[upstreamAddr]
 	// TODO(e.burkov):  Improve identifying duplicate upstreams.
 	if !ok {
 		// create an upstream
-		dnsUpstream, err = upstream.AddressToUpstream(u, p.options.Clone())
+		dnsUpstream, err = upstream.AddressToUpstream(upstreamAddr, p.options.Clone())
 		if err != nil {
 			return fmt.Errorf("cannot prepare the upstream: %s", err)
 		}
 
 		// save to the index
-		p.upstreamsIndex[u] = dnsUpstream
+		p.upstreamsIndex[upstreamAddr] = dnsUpstream
 	}
 
 	addr := dnsUpstream.Address()
+
+	// If flags already exist, merge them (in case same upstream is used multiple times)
+	if existingOpts, exists := p.upstreamFlags[addr]; exists {
+		existingOpts.Merge(flags)
+	} else {
+		p.upstreamFlags[addr] = flags
+	}
+
 	if len(domains) == 0 {
 		// TODO(s.chzhen):  Handle duplicates.
 		p.upstreams = append(p.upstreams, dnsUpstream)
