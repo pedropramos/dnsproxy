@@ -758,6 +758,32 @@ func (p *Proxy) Resolve(dctx *DNSContext) (err error) {
 	return err
 }
 
+// shouldSkipCacheForUpstream checks if caching should be skipped for the selected upstream.
+// It checks both the main upstream config and custom upstream config for the nocache flag.
+func (p *Proxy) shouldSkipCacheForUpstream(d *DNSContext) (skip bool) {
+	if d.Upstream == nil {
+		return false
+	}
+
+	addr := d.Upstream.Address()
+
+	// Check custom upstream config first if present
+	if d.CustomUpstreamConfig != nil && d.CustomUpstreamConfig.upstream != nil {
+		if flags, ok := d.CustomUpstreamConfig.upstream.UpstreamFlags[addr]; ok && flags.NoCache {
+			return true
+		}
+	}
+
+	// Check in main UpstreamConfig
+	if p.UpstreamConfig != nil {
+		if flags, ok := p.UpstreamConfig.UpstreamFlags[addr]; ok && flags.NoCache {
+			return true
+		}
+	}
+
+	return false
+}
+
 // cacheWorks returns true if the cache works for the given context.  If not, it
 // returns false and logs the reason why.
 func (p *Proxy) cacheWorks(dctx *DNSContext) (ok bool) {

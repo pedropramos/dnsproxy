@@ -80,6 +80,15 @@ func cloneIPNet(n *net.IPNet) (clone *net.IPNet) {
 // cacheResp stores the response from d in general or subnet cache.  In case the
 // cache is present in d, it's used first.
 func (p *Proxy) cacheResp(d *DNSContext) {
+	// Check if the upstream has NoCache flag set
+	if p.shouldSkipCacheForUpstream(d) {
+		p.logger.Debug(
+			"skipping cache for upstream with nocache flag",
+			"upstream", d.Upstream.Address(),
+		)
+		return
+	}
+
 	dctxCache := p.cacheForContext(d)
 
 	if !p.EnableEDNSClientSubnet {
