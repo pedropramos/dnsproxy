@@ -8,10 +8,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/AdguardTeam/dnsproxy/internal/version"
 	"github.com/AdguardTeam/golibs/errors"
 	"github.com/AdguardTeam/golibs/osutil"
 	"github.com/AdguardTeam/golibs/timeutil"
+	"github.com/AdguardTeam/golibs/version"
 )
 
 // Indexes to help with the [commandLineOptions] initialization.
@@ -67,6 +67,9 @@ const (
 	pendingRequestsEnabledIdx
 	dns64Idx
 	usePrivateRDNSIdx
+	dohRoutesIdx
+	dohInsecureEnabledIdx
+	dnssecEnabledIdx
 )
 
 // commandLineOption contains information about a command-line option: its long
@@ -121,7 +124,7 @@ var commandLineOptions = []*commandLineOption{
 	},
 	dnsCryptConfigPathIdx: {
 		description: "Path to a file with DNSCrypt configuration. You can generate one using " +
-			"https://github.com/ameshkov/dnscrypt.",
+			"https://github.com/AdguardTeam/dnscrypt.",
 		long:      "dnscrypt-config",
 		short:     "g",
 		valueType: "path",
@@ -405,6 +408,24 @@ var commandLineOptions = []*commandLineOption{
 		short:     "",
 		valueType: "",
 	},
+	dohRoutesIdx: {
+		description: "List of routes for DNS-over-HTTPS, can be specified multiple times.",
+		long:        "doh-routes",
+		short:       "",
+		valueType:   "route",
+	},
+	dohInsecureEnabledIdx: {
+		description: "If specified, the DoH server will skip TLS certificate verification.",
+		long:        "doh-insecure-enabled",
+		short:       "",
+		valueType:   "",
+	},
+	dnssecEnabledIdx: {
+		description: "Defines whether the proxy should set the DO bits in the upstream requests.",
+		long:        "dnssec",
+		short:       "",
+		valueType:   "",
+	},
 }
 
 // parseCmdLineOptions parses the command-line options.  conf must not be nil.
@@ -464,6 +485,9 @@ func parseCmdLineOptions(conf *configuration) (err error) {
 		pendingRequestsEnabledIdx:   &conf.PendingRequestsEnabled,
 		dns64Idx:                    &conf.DNS64,
 		usePrivateRDNSIdx:           &conf.UsePrivateRDNS,
+		dohRoutesIdx:                &conf.DoHRoutes,
+		dohInsecureEnabledIdx:       &conf.DoHInsecureEnabled,
+		dnssecEnabledIdx:            &conf.DNSSECEnabled,
 	} {
 		addOption(flags, fieldPtr, commandLineOptions[i])
 	}
@@ -536,8 +560,8 @@ func addOption(flags *flag.FlagSet, fieldPtr any, o *commandLineOption) {
 		defineFlagVar(flags, (*uint32Value)(fieldPtr), o)
 	case *float32:
 		defineFlagVar(flags, (*float32Value)(fieldPtr), o)
-	case *[]int:
-		defineFlagVar(flags, newIntSliceValue(fieldPtr), o)
+	case *[]uint16:
+		defineFlagVar(flags, newUInt16SliceValue(fieldPtr), o)
 	case *[]string:
 		defineFlagVar(flags, newStringSliceValue(fieldPtr), o)
 	case *timeutil.Duration:
